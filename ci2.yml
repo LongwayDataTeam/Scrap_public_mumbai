@@ -1,0 +1,60 @@
+name: Daily Scraper Mumbai
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Runs daily at 6:30 AM IST → 1:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Setup SSH
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_ed25519
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    # Step 2: Clone private repo
+    - name: Clone private repo
+      run: |
+        git clone git@github.com:LongwayDataTeam/Amz_Flp_Data_Scraper_Mumbai.git
+
+    # Step 3: Set up Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    # Step 4: Install system dependencies (Chrome & ChromeDriver)
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip jq xvfb libnss3 libxss1 libxi6 fonts-liberation libu2f-udev
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
+        DRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
+          | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform == "linux64") | .url')
+        wget -O chromedriver.zip "$DRIVER_URL"
+        unzip chromedriver.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+
+    # Step 5: Install Python dependencies
+    - name: Install Python dependencies
+      run: |
+        cd Amz_Flp_Data_Scraper_Mumbai
+        pip install -r requirements.txt
+    
+    # Step 6: Run your scraper from the private repo
+    - name: Run scraping script
+      env:
+        GSHEET_CREDENTIALS: ${{ secrets.GSHEET_CREDENTIALS }}
+      run: |
+        cd Amz_Flp_Data_Scraper_Mumbai
+        python amz_flp_data_scraper_mumbai.py
