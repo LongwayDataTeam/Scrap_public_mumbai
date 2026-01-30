@@ -2,7 +2,7 @@ name: Daily Scraper Mumbai
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # Runs daily at 6:30 AM IST → 1:00 AM UTC
+    - cron: "0 1 * * *"   # Runs daily at 6:30 AM IST → 1:00 AM UTC
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Step 1: Setup SSH
+
+    # ✅ Step 1: Setup SSH
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
@@ -20,38 +21,48 @@ jobs:
         ssh-add ~/.ssh/id_ed25519
         ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-    # Step 2: Clone private repo
+    # ✅ Step 2: Clone private repo
     - name: Clone private repo
       run: |
         git clone git@github.com:LongwayDataTeam/Amz_Flp_Data_Scraper_Mumbai.git
 
-    # Step 3: Set up Python
+    # ✅ Step 3: Set up Python
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: "3.10"
+        cache: "pip"
 
-    # Step 4: Install system dependencies (Chrome & ChromeDriver)
-    - name: Install system dependencies
+    # ✅ Step 4: Install ONLY Google Chrome (NO ChromeDriver)
+    - name: Install Google Chrome
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget unzip jq xvfb libnss3 libxss1 libxi6 fonts-liberation libu2f-udev
+        sudo apt-get install -y wget unzip xvfb libnss3 libxss1 libxi6 fonts-liberation libu2f-udev
+
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo dpkg -i google-chrome-stable_current_amd64.deb || sudo apt-get -f install -y
-        DRIVER_URL=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" \
-          | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform == "linux64") | .url')
-        wget -O chromedriver.zip "$DRIVER_URL"
-        unzip chromedriver.zip
-        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
 
-    # Step 5: Install Python dependencies
+        echo "✅ Installed Chrome Version:"
+        google-chrome --version
+
+    # ✅ Step 5: Remove any preinstalled ChromeDriver (Very Important!)
+    - name: Remove system ChromeDriver
+      run: |
+        sudo rm -f /usr/local/bin/chromedriver
+        sudo rm -f /usr/bin/chromedriver
+        echo "✅ Old ChromeDriver removed"
+
+    # ✅ Step 6: Install Python dependencies + webdriver-manager
     - name: Install Python dependencies
       run: |
         cd Amz_Flp_Data_Scraper_Mumbai
+        pip install --upgrade pip
         pip install -r requirements.txt
-    
-    # Step 6: Run your scraper from the private repo
+
+        # ✅ Required to auto-download correct driver
+        pip install webdriver-manager
+
+    # ✅ Step 7: Run scraper script
     - name: Run scraping script
       env:
         GSHEET_CREDENTIALS: ${{ secrets.GSHEET_CREDENTIALS }}
